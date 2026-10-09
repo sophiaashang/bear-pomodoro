@@ -21,16 +21,32 @@ A tiny always-on-top Pomodoro timer for Windows, with an animated bear, built-in
 
 ## 安装与运行
 
-需要 Windows 10 / 11 和 Python 3（标准安装自带 tkinter）。
+只支持 Windows 10 / 11。
+
+**1. 装 Python 3**：到 <https://www.python.org/downloads/> 下载安装。安装界面最下面一定要勾上 **Add python.exe to PATH**，不勾的话后面会找不到命令。tkinter 随 Python 一起装好，不用另外装。
+
+**2. 拿到代码**，二选一：
+- 会用 git：`git clone https://github.com/sophiaashang/bear-pomodoro.git`
+- 不会用：在仓库页面点绿色的 **Code**，选 **Download ZIP**，解压到任意文件夹。
+
+**3. 启动**，二选一：
+- **双击 `start.bat`**。第一次会自动安装 Pillow，之后直接启动，窗口出现在屏幕右下角。
+- 或者在文件夹里打开终端：
 
 ```bash
 pip install -r requirements.txt
 pythonw bear_pomodoro.py        # 无控制台窗口运行
-# 或
-python bear_pomodoro.py
+# 或 python bear_pomodoro.py    # 带控制台，出错时能看到报错
 ```
 
 也可以传入一个开始时间戳，让倒计时从那个时刻算起：`pythonw bear_pomodoro.py 1760000000`。
+
+**启动不了？**
+- 双击后提示找不到 Python：说明没装或没勾 PATH，重装一次并勾上。
+- 窗口一闪就没了：用 `python bear_pomodoro.py` 启动，看终端里的报错。
+- 点“音乐”提示网络不通：音乐走的是网易云的非官方接口，可能被网络环境挡住或接口已变。计时功能不受影响。
+
+**退出**：展开状态下点右上角的 ✕。**开机自启**：把 `start.bat` 的快捷方式放进 `shell:startup` 文件夹（Win+R 输入 `shell:startup`）。
 
 第一次运行会在脚本目录生成 `pomodoro_sounds/`（提示音）；点播放后会生成 `pomodoro_music/`（歌曲缓存）。这些都已写进 `.gitignore`。
 
