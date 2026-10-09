@@ -1,0 +1,10 @@
+# 运行时生成的文件
+pomodoro_music/
+pomodoro_sounds/
+pomodoro.pid
+pomodoro.log
+pomodoro_state.json
+
+# Python
+__pycache__/
+*.pyc
