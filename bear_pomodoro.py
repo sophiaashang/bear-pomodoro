@@ -102,8 +102,9 @@ def say(cat): return DECKS[cat].draw()
 FOCUS_SCENES = ["book", "laptop", "coffee", "writing"]
 REST_SCENES = ["tea", "cello", "guitar", "mahjong", "movie"]
 
-BG, FG, DIM, ACC, GOLD, TEAL = "#16141a", "#ece7dc", "#8f8a99", "#a94442", "#d4af37", "#7fb7a4"
-PILL, PILL_HOV, TRACK = "#241f2b", "#322b3b", "#2a2530"
+BG, FG, DIM, ACC, GOLD, TEAL = "#16141a", "#ece7dc", "#a39eae", "#a94442", "#d4af37", "#7fb7a4"
+BTN_RED = "#e5736f"        # 按钮上的红字（比装饰用的 ACC 更亮，深色底上才看得清）
+PILL, PILL_HOV, TRACK = "#241f2b", "#322b3b", "#3a3446"
 W, H = 300, 182            # 展开时的窗口尺寸
 CW, CH = 168, 62           # 收起时的小胶囊：只留小熊、倒计时和一条细进度条
 AUTO_COLLAPSE = True       # 鼠标移开自动收起并变透明，移过去自动展开；设为 False 则一直展开
@@ -672,8 +673,8 @@ class App:
         self.lab_song = cv.create_text(S(18), S(131), text="♫ 点播放，随机来点纯音乐", anchor="w", fill=GOLD, font=self.font(11))
         self.add_button("play", 14, 78, 146, 170, "▶ 音乐", GOLD, self.on_play)
         self.add_button("next", 82, 112, 146, 170, "⏭", GOLD, self.on_next)
-        self.add_button("pause", 116, 190, 146, 170, "⏱ 暂停", DIM, self.on_pause)
-        self.add_button("act", 194, 286, 146, 170, "提前休息", ACC, self.on_act)
+        self.add_button("pause", 116, 190, 146, 170, "⏱ 停表", DIM, self.on_pause)
+        self.add_button("act", 194, 286, 146, 170, "提前休息", BTN_RED, self.on_act)
         self._press = None
         cv.bind("<Button-1>", self.press); cv.bind("<B1-Motion>", self.drag); cv.bind("<ButtonRelease-1>", self.release)
 
@@ -774,17 +775,25 @@ class App:
         self.root.after(40, self.fade_loop)
 
     # ---- 音乐 ----
+    def fit_text(self, text, font, maxw):
+        """按真实像素宽度截断，放不下才加省略号"""
+        import tkinter.font as tkfont
+        f = tkfont.Font(font=font)
+        if f.measure(text) <= maxw: return text
+        while len(text) > 1 and f.measure(text + "…") > maxw: text = text[:-1]
+        return text + "…"
+
     def set_song(self, text):
         def f():
-            self.cv.itemconfig(self.lab_song, text=text if len(text) <= 22 else text[:21] + "…")
+            self.cv.itemconfig(self.lab_song, text=self.fit_text(text, self.font(11), self.S(264)))
             p = self.music.player
-            self.set_btn("play", ("▶ 继续" if p.paused else "⏸ 暂停") if p.open_ else "▶ 音乐")
+            self.set_btn("play", "⏸ 音乐" if (p.open_ and not p.paused) else "▶ 音乐")
         self.root.after(0, f)
 
     def on_play(self):
         p = self.music.player
         if p.open_:
-            p.toggle(); self.set_btn("play", "▶ 继续" if p.paused else "⏸ 暂停")
+            p.toggle(); self.set_btn("play", "▶ 音乐" if p.paused else "⏸ 音乐")
         else:
             self.music.next()
 
@@ -800,11 +809,11 @@ class App:
             k = self.done_n % SET + 1
             c.itemconfig(self.lab_round, text=f"小熊陪你 · 专注 {k}/{SET}", fill=GOLD)
             c.itemconfig(self.pb_fill, fill=GOLD)
-            self.set_btn("act", "提前休息", ACC)
+            self.set_btn("act", "提前休息", BTN_RED)
         else:
             c.itemconfig(self.lab_round, text="长休息 · 好好歇一歇" if self.long else "休息中", fill=TEAL)
             c.itemconfig(self.pb_fill, fill=TEAL)
-            self.set_btn("act", "跳过休息", ACC)
+            self.set_btn("act", "跳过休息", BTN_RED)
         filled = SET if (self.mode == "rest" and self.long) else self.done_n % SET
         for i, o in enumerate(self.dots): c.itemconfig(o, fill=GOLD if i < filled else TRACK)
         c.itemconfig(self.lab_today, text=f"今日 {self.today} 个")
@@ -816,7 +825,7 @@ class App:
         self.mode = mode; self.long = long; self.elapsed = 0.0; self._last = time.time()
         self.total = self.phase_total(mode, long); self.running = True
         self.scene_off = random.randrange(10)
-        self.set_btn("pause", "⏱ 暂停", DIM)
+        self.set_btn("pause", "⏱ 停表", DIM)
         self.refresh_labels()
         if natural:                                          # 自然走完：先庆祝几秒，再说正常的话
             self.celebrate_until = time.time() + (6.0 if prev == "focus" else 4.0); self.celeb_msg_pending = True
@@ -847,7 +856,7 @@ class App:
 
     def on_pause(self):
         self.running = not self.running; self._last = time.time()
-        self.set_btn("pause", "⏱ 暂停" if self.running else "⏱ 继续", DIM if self.running else GOLD)
+        self.set_btn("pause", "⏱ 停表" if self.running else "⏱ 继续", DIM if self.running else GOLD)
         self.cv.itemconfig(self.lab_time, fill=FG if self.running else GOLD)   # 收起时也能看出暂停了
         if not self.running:
             self.cv.itemconfig(self.lab_msg, text=say("pause"), fill=GOLD)
