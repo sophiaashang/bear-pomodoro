@@ -8,16 +8,20 @@
 - 置顶、无边框、圆角、不进任务栏；窗口固定尺寸
 用法: pythonw bear_pomodoro.py [开始时间戳]
 """
-import array, ctypes, datetime, json, math, os, random, re, sys, threading, time, urllib.request, wave
-import ctypes.wintypes as wt
+import array, ctypes, datetime, json, math, os, random, re, signal, subprocess, sys, threading, time, urllib.request, wave
 import tkinter as tk
 from PIL import Image, ImageDraw, ImageTk
 
-try:
-    ctypes.windll.shcore.SetProcessDpiAwareness(2)
-except Exception:
-    try: ctypes.windll.user32.SetProcessDPIAware()
-    except Exception: pass
+IS_WIN = sys.platform == "win32"
+IS_MAC = sys.platform == "darwin"
+
+if IS_WIN:
+    import ctypes.wintypes as wt
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try: ctypes.windll.user32.SetProcessDPIAware()
+        except Exception: pass
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MUSIC_DIR = os.path.join(HERE, "pomodoro_music")
@@ -124,7 +128,11 @@ def single_instance():
     try:
         old = int(open(PID_FILE).read().strip())
         if old != os.getpid():
-            os.system(f"taskkill /F /PID {old} >nul 2>&1")
+            if IS_WIN:
+                os.system(f"taskkill /F /PID {old} >nul 2>&1")
+            else:
+                cmd = subprocess.run(["ps", "-p", str(old), "-o", "command="], capture_output=True, text=True).stdout
+                if "bear_pomodoro" in cmd: os.kill(old, signal.SIGTERM)
     except Exception: pass
     open(PID_FILE, "w").write(str(os.getpid()))
 
@@ -196,8 +204,11 @@ def ensure_sounds():
 
 def play_sound(path):
     try:
-        import winsound
-        winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        if IS_WIN:
+            import winsound
+            winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+        elif IS_MAC:
+            subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as e:
         log("sound err", repr(e))
 
@@ -449,7 +460,7 @@ def render_bear(state, music, t, px, scene="book"):
 
 
 # =====================  播放器 / 取曲（只放纯音乐）  =====================
-class Player:
+class WinPlayer:
     def __init__(self):
         self.mci = ctypes.windll.winmm.mciSendStringW
         self.open_ = False; self.paused = False; self.volume = 600
@@ -486,6 +497,55 @@ class Player:
     def length_ms(self):
         _, v = self._s("status pm length")
         return int(v) if v.isdigit() else 0
+
+
+class MacPlayer:
+    """macOS：用系统自带的 afplay 播放；暂停/继续靠 SIGSTOP/SIGCONT；时长用 afinfo 读"""
+    def __init__(self):
+        self.proc = None; self.open_ = False; self.paused = False; self.volume = 600; self._len = 0
+
+    @staticmethod
+    def _duration_ms(path):
+        try:
+            out = subprocess.run(["afinfo", path], capture_output=True, text=True, timeout=10).stdout
+            m = re.search(r"estimated duration:\s*([\d.]+)", out)
+            if m: return int(float(m.group(1)) * 1000)
+        except Exception as e:
+            log("afinfo err", repr(e))
+        return int(os.path.getsize(path) / 16000 * 1000)       # 读不到就按 128kbps 粗估
+
+    def play(self, path):
+        self.stop()
+        try:
+            self._len = self._duration_ms(path)
+            self.proc = subprocess.Popen(["afplay", "-v", str(self.volume / 1000.0), path],
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            log("afplay err", repr(e)); self.proc = None; return False
+        self.open_ = True; self.paused = False
+        return True
+
+    def stop(self):
+        p = self.proc
+        if p is not None:
+            try:
+                if self.paused: p.send_signal(signal.SIGCONT)
+                p.terminate(); p.wait(2)
+            except Exception: pass
+        self.proc = None; self.open_ = False; self.paused = False
+
+    def toggle(self):
+        if not self.proc or self.proc.poll() is not None: return
+        self.proc.send_signal(signal.SIGCONT if self.paused else signal.SIGSTOP)
+        self.paused = not self.paused
+
+    def ended(self):
+        return bool(self.open_ and not self.paused and self.proc is not None and self.proc.poll() is not None)
+
+    def length_ms(self): return self._len
+
+
+Player = WinPlayer if IS_WIN else MacPlayer
 
 
 H_UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://music.163.com/"}
@@ -578,6 +638,8 @@ class Music:
 
 
 def decorate(win):
+    if not IS_WIN:
+        return None          # macOS：圆角/不进任务栏的 Windows 专用接口不适用，靠 overrideredirect + topmost
     u = ctypes.windll.user32
     try:
         win.update_idletasks()
@@ -611,7 +673,7 @@ class App:
         r.overrideredirect(True); r.attributes("-topmost", True); r.attributes("-alpha", ALPHA_FULL)
         r.resizable(False, False)
         sw, sh = r.winfo_screenwidth(), r.winfo_screenheight()
-        try: self.s = ctypes.windll.user32.GetDpiForSystem() / 96
+        try: self.s = ctypes.windll.user32.GetDpiForSystem() / 96 if IS_WIN else 1.0
         except Exception: self.s = 1.0
         self.pw, self.ph = int(W * self.s), int(H * self.s)
         r.geometry(f"{self.pw}x{self.ph}+{sw - self.pw - 24}+{sh - self.ph - 100}")
@@ -633,7 +695,9 @@ class App:
 
     def S(self, v): return v * self.s
     def font(self, px, bold=False, mono=False):
-        return ("Consolas" if mono else "Microsoft YaHei UI", -int(round(px * self.s)), "bold" if bold else "normal")
+        if IS_MAC: fam = "Menlo" if mono else "PingFang SC"
+        else: fam = "Consolas" if mono else "Microsoft YaHei UI"
+        return (fam, -int(round(px * self.s)), "bold" if bold else "normal")
 
     def sound(self, name):
         if not self.silent: play_sound(self.sounds[name])
@@ -737,6 +801,7 @@ class App:
         self.render_progress()
 
     def cursor_pos(self):
+        if not IS_WIN: return self.root.winfo_pointerxy()
         pt = wt.POINT(); ctypes.windll.user32.GetCursorPos(ctypes.byref(pt)); return pt.x, pt.y
 
     def cursor_inside(self, margin=0):

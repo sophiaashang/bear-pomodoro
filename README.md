@@ -21,7 +21,7 @@ A tiny always-on-top Pomodoro timer for Windows, with an animated bear, built-in
 
 ## 安装与运行
 
-只支持 Windows 10 / 11。
+Windows 10 / 11 为正式支持。macOS 为**实验版**，见下面「macOS（实验版）」。
 
 **1. 装 Python 3**：到 <https://www.python.org/downloads/> 下载安装。安装界面最下面一定要勾上 **Add python.exe to PATH**，不勾的话后面会找不到命令。tkinter 随 Python 一起装好，不用另外装。
 
@@ -49,6 +49,14 @@ pythonw bear_pomodoro.py        # 无控制台窗口运行
 **退出**：展开状态下点右上角的 ✕。**开机自启**：把 `start.bat` 的快捷方式放进 `shell:startup` 文件夹（Win+R 输入 `shell:startup`）。
 
 第一次运行会在脚本目录生成 `pomodoro_sounds/`（提示音）；点播放后会生成 `pomodoro_music/`（歌曲缓存）。这些都已写进 `.gitignore`。
+
+## macOS（实验版）
+
+macOS 支持是新加的，**作者没有 Mac，没法在真机上长期使用测试**，目前只在 GitHub 的 macOS 机器上跑过自动冒烟测试。遇到问题请到 Issues 里反馈，写上系统版本、Python 版本和终端里的报错，我会按反馈修。
+
+- 安装：装 Python 3（官网安装包自带 tkinter），在终端进入文件夹运行 `pip3 install -r requirements.txt`，再 `python3 bear_pomodoro.py`；或者给 `start.command` 加执行权限后双击（`chmod +x start.command`）。
+- 提示音和音乐用系统自带的 `afplay` 播放；暂停靠进程信号实现。
+- 和 Windows 版的差别：窗口是直角、可能出现在 Dock；无边框置顶窗口在 macOS 上的表现因系统版本而异。
 
 ## 操作
 
@@ -81,7 +89,7 @@ pythonw bear_pomodoro.py        # 无控制台窗口运行
 
 ## 已知限制
 
-- 仅支持 Windows（用到了 MCI 播放、DWM 圆角、窗口扩展样式等系统接口）。
+- Windows 为主要支持平台（MCI 播放、DWM 圆角、窗口扩展样式）；macOS 为实验版，圆角和隐藏任务栏没有对应实现。
 - 窗口位置默认在主显示器右下角，不会记住上次拖动到的位置。
 - 音量固定，暂时没有音量调节。
 
@@ -93,7 +101,7 @@ pythonw bear_pomodoro.py        # 无控制台窗口运行
 
 ## English notes
 
-- Windows 10/11 only. `pip install -r requirements.txt`, then `pythonw bear_pomodoro.py`.
+- Windows 10/11 supported; macOS is experimental and untested on real hardware (CI smoke test only), feedback welcome. `pip install -r requirements.txt`, then `pythonw bear_pomodoro.py`.
 - Auto-loops 25 min focus → 5 min rest, with a 15 min long break after every 4 pomodoros. Pause / skip buttons are available.
 - Music comes from public NetEase Cloud Music playlists through **unofficial** endpoints, lyrics are checked so only instrumental tracks are played. No audio is bundled; use at your own discretion and respect the rights holders and the platform's terms.
 - UI strings live in `phrases.json` (Chinese); durations, playlists and colours are constants at the top of `bear_pomodoro.py`.
